@@ -1,3 +1,22 @@
-baseurl = "http://yourSiteHere/"
+baseurl = "http://roisagiv.github.io/"
 languageCode = "en-us"
 title = "Learning the hard way!"
+theme = "hyde-x"
+layoutdir = "layouts"
+publishdir = "public"
+canonifyurls = true
+pygmentsstyle = "colorful"
+
+# hyde-x
+[author]
+    name = "Roi Sagiv"
+
+[permalinks]
+    # Change the permalink format for the 'post' content type.
+    post = "/blog/:year/:month/:day/:title/"
+
+[Params]
+    highlight = "solarized-dark"
+    github = "https://github.com/roisagiv"
+    linkedin = "http://www.linkedin.com/in/roisagiv"
+    tagline = "Taking the longer path"
