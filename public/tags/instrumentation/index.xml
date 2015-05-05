@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Instrumentation on Learning the hard way!</title>
+    <link>http://roisagiv.github.io/tags/instrumentation/</link>
+    <description>Recent content in Instrumentation on Learning the hard way!</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 06 Jan 2014 20:51:07 +0200</lastBuildDate>
+    <atom:link href="http://roisagiv.github.io/tags/instrumentation/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Testing a loader using instrumentation</title>
+      <link>http://roisagiv.github.io/blog/2014/01/06/testing-a-loader-using-instrumentation/</link>
+      <pubDate>Mon, 06 Jan 2014 20:51:07 +0200</pubDate>
+      
+      <guid>http://roisagiv.github.io/blog/2014/01/06/testing-a-loader-using-instrumentation/</guid>
+      <description>&lt;p&gt;One of the biggest challenges when authoring instrumentation tests in Android is testing async code.
+AsyncTasks, Loaders, Handlers, etc.&lt;br /&gt;
+Robolectric for example, provides very convenient tools for this task (take a look at the &lt;a href=&#34;https://github.com/robolectric/robolectric/blob/master/src/main/java/org/robolectric/util/Scheduler.java&#34;&gt;Scheduler&lt;/a&gt;) class,&lt;br /&gt;
+But since we&amp;rsquo;re running instrumentation tests we don&amp;rsquo;t have those tools.&lt;/p&gt;
+
+&lt;p&gt;Back to loaders,&lt;br /&gt;
+Suppose we have an activity that initiate and load a loader on it&amp;rsquo;s onCreate method.
+&lt;div class=&#34;highlight&#34; style=&#34;background: #ffffff&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color: #BB0066; font-weight: bold&#34;&gt;BookListActivity&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;extends&lt;/span&gt; FragmentActivity
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;implements&lt;/span&gt; LoaderManager&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;LoaderCallbacks&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;List&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;Book&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&amp;gt;&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;protected&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;static&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;final&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;int&lt;/span&gt; LOADER_ID_BOOK_LIST &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color: #0000DD; font-weight: bold&#34;&gt;100&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;;&lt;/span&gt;
+
+  &lt;span style=&#34;color: #888888&#34;&gt;// this field will be used in the test to validate onLoadFinished was called&lt;/span&gt;
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;protected&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;boolean&lt;/span&gt; loaderFinished&lt;span style=&#34;color: #333333&#34;&gt;;&lt;/span&gt;
+
+  &lt;span style=&#34;color: #555555; font-weight: bold&#34;&gt;@Override&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;protected&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;onCreate&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;Bundle savedInstanceState&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;super&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;onCreate&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;savedInstanceState&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+
+    Loader&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;List&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;Book&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&amp;gt;&lt;/span&gt; loader &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt;
+        getSupportLoaderManager&lt;span style=&#34;color: #333333&#34;&gt;().&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;initLoader&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;LOADER_ID_BOOK_LIST&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;null&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;this&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+    loader&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;forceLoad&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;();&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+  &lt;span style=&#34;color: #555555; font-weight: bold&#34;&gt;@Override&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; Loader&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;List&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;Book&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&amp;gt;&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;onCreateLoader&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;&lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;int&lt;/span&gt; i&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; Bundle bundle&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    loaderFinished &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;false&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;;&lt;/span&gt;
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;new&lt;/span&gt; BooksQueryLoader&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;&lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;this&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+  &lt;span style=&#34;color: #555555; font-weight: bold&#34;&gt;@Override&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;onLoadFinished&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;Loader&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;List&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;Book&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&amp;gt;&lt;/span&gt; loader&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; List&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;Book&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&lt;/span&gt; data&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #888888&#34;&gt;// bind the results to UI elements (ListView, TextView, etc)&lt;/span&gt;
+    loaderFinished &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;true&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;;&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+  &lt;span style=&#34;color: #555555; font-weight: bold&#34;&gt;@Override&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;onLoaderReset&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;Loader&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;List&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;Book&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&amp;gt;&lt;/span&gt; objectLoader&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;div class=&#34;highlight&#34; style=&#34;background: #ffffff&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color: #BB0066; font-weight: bold&#34;&gt;BooksQueryLoader&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;extends&lt;/span&gt; AsyncTaskLoader&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;List&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;Book&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&amp;gt;&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;BooksQueryLoader&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;Context context&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;super&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;context&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+  &lt;span style=&#34;color: #555555; font-weight: bold&#34;&gt;@Override&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; List&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;Book&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;loadInBackground&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;()&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #888888&#34;&gt;// do a query here that might take some time&lt;/span&gt;
+
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;try&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+      &lt;span style=&#34;color: #888888&#34;&gt;// simulate time consuming task&lt;/span&gt;
+      Thread&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;sleep&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;&lt;span style=&#34;color: #0000DD; font-weight: bold&#34;&gt;2&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;*&lt;/span&gt; &lt;span style=&#34;color: #0000DD; font-weight: bold&#34;&gt;1000&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+    &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;catch&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;InterruptedException ignored&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;new&lt;/span&gt; ArrayList&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;Book&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;();&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/p&gt;
+
+&lt;p&gt;How would we test the code that executed on onLoadFinished method?&lt;/p&gt;
+
+&lt;p&gt;In one of the times I cruised around the Android source code I stumbled upon the &lt;a href=&#34;https://github.com/android/platform_packages_apps_contacts/blob/master/src/com/android/contacts/interactions/TestLoaderManager.java&#34;&gt;TestLoaderManager&lt;/a&gt; class.&lt;br /&gt;
+Let&amp;rsquo;s see how to use this trick to wait for Loaders to finish (and call onLoadFinished) in a test.&lt;/p&gt;
+
+&lt;p&gt;Here is the test:
+&lt;div class=&#34;highlight&#34; style=&#34;background: #ffffff&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color: #BB0066; font-weight: bold&#34;&gt;BookListActivityTest&lt;/span&gt;
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;extends&lt;/span&gt; ActivityInstrumentationTestCase2&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;BookListActivity&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;BookListActivityTest&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;()&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;super&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;BookListActivity&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;class&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;testTryingOutTheLoader&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;()&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    BookListActivity activity &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; getActivity&lt;span style=&#34;color: #333333&#34;&gt;();&lt;/span&gt;
+
+    Loader&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;?&amp;gt;&lt;/span&gt; loader &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt;
+        activity&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;getSupportLoaderManager&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;().&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;getLoader&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;BookListActivity&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;LOADER_ID_BOOK_LIST&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+
+    &lt;span style=&#34;color: #888888&#34;&gt;// this is where the &amp;quot;magic&amp;quot; happens&lt;/span&gt;
+    LoaderUtils&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;waitForLoader&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;loader&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+
+    &lt;span style=&#34;color: #888888&#34;&gt;// this test passes only if onLoaderFinished method is called&lt;/span&gt;
+    assertTrue&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;activity&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;loaderFinished&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/p&gt;
+
+&lt;p&gt;Here is the code for LoaderUtils (inspired by TestLoaderManager class from the Android source code):
+&lt;div class=&#34;highlight&#34; style=&#34;background: #ffffff&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color: #BB0066; font-weight: bold&#34;&gt;LoaderUtils&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;static&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;waitForLoader&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;Loader&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;?&amp;gt;&lt;/span&gt; loader&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;final&lt;/span&gt; AsyncTaskLoader&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;?&amp;gt;&lt;/span&gt; asyncTaskLoader
+        &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;AsyncTaskLoader&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;?&amp;gt;)&lt;/span&gt; loader&lt;span style=&#34;color: #333333&#34;&gt;;&lt;/span&gt;
+
+    Thread waitThreads &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;new&lt;/span&gt; Thread&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;&lt;span style=&#34;background-color: #fff0f0&#34;&gt;&amp;quot;LoaderWaitingThread&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+      &lt;span style=&#34;color: #555555; font-weight: bold&#34;&gt;@Override&lt;/span&gt;
+      &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;run&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;()&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+        &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;try&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+          asyncTaskLoader&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;waitForLoader&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;();&lt;/span&gt;
+        &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;catch&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;Throwable e&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+          Assert&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;fail&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;&lt;span style=&#34;background-color: #fff0f0&#34;&gt;&amp;quot;Exception while waiting for loader: &amp;quot;&lt;/span&gt;
+                &lt;span style=&#34;color: #333333&#34;&gt;+&lt;/span&gt; asyncTaskLoader&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;getId&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;());&lt;/span&gt;
+        &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+      &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+    &lt;span style=&#34;color: #333333&#34;&gt;};&lt;/span&gt;
+
+    waitThreads&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;start&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;();&lt;/span&gt;
+
+    &lt;span style=&#34;color: #888888&#34;&gt;// Now we wait for all these threads to finish&lt;/span&gt;
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;try&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+      waitThreads&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;join&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;();&lt;/span&gt;
+    &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;catch&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;InterruptedException ignored&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+This trick will work with &lt;a href=&#34;http://developer.android.com/reference/android/content/CursorLoader.html&#34;&gt;CursorLoader&lt;/a&gt; too, as CursorLoader class inherit from AsyncTackLoader class.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Testing a fragment using instrumentation</title>
+      <link>http://roisagiv.github.io/blog/2014/01/04/testing-a-fragment-using-instrumentation/</link>
+      <pubDate>Sat, 04 Jan 2014 12:05:50 +0200</pubDate>
+      
+      <guid>http://roisagiv.github.io/blog/2014/01/04/testing-a-fragment-using-instrumentation/</guid>
+      <description>&lt;p&gt;Fragments are core component in Android, but somehow the Android SDK does not provide out of the box
+way to test them.&lt;br /&gt;
+Activities, ContentProviders, Services has their corresponding class (ActivityInstrumentationTestCase2, ProviderTestCase2 and ServiceTestCase), but where is my FragmentTestCase?&lt;/p&gt;
+
+&lt;p&gt;One trick I use is an empty Activity class just to contain the Fragment I want to test, and use ActivityInstrumentationTestCase2 to contain my tests.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s see an example,&lt;br /&gt;
+We want to test a fragment called BooksFragment.&lt;br /&gt;
+Let&amp;rsquo;s see how a test class might look like:&lt;/p&gt;
+
+&lt;p&gt;&lt;div class=&#34;highlight&#34; style=&#34;background: #ffffff&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color: #BB0066; font-weight: bold&#34;&gt;BooksFragmentTest&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;extends&lt;/span&gt; ActivityInstrumentationTestCase2&lt;span style=&#34;color: #333333&#34;&gt;&amp;lt;&lt;/span&gt;FragmentContainerActivity&lt;span style=&#34;color: #333333&#34;&gt;&amp;gt;&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;private&lt;/span&gt; BooksFragment booksFragment&lt;span style=&#34;color: #333333&#34;&gt;;&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;BooksFragmentTest&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;()&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;super&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;FragmentContainerActivity&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;class&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+  &lt;span style=&#34;color: #555555; font-weight: bold&#34;&gt;@Override&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;protected&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;setUp&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;()&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;throws&lt;/span&gt; Exception &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;super&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;setUp&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;();&lt;/span&gt;
+
+    booksFragment &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;new&lt;/span&gt; BooksFragment&lt;span style=&#34;color: #333333&#34;&gt;();&lt;/span&gt;
+    getActivity&lt;span style=&#34;color: #333333&#34;&gt;().&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;addFragment&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;booksFragment&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; BooksFragment&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;class&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;getSimpleName&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;());&lt;/span&gt;
+    getInstrumentation&lt;span style=&#34;color: #333333&#34;&gt;().&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;waitForIdleSync&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;();&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;test_Should_Set_Title_TextView_Text&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;()&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    TextView titleTextView &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;TextView&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; booksFragment&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;getView&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;().&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;findById&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;R&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;id&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;title&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+    assertEqual&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;&lt;span style=&#34;background-color: #fff0f0&#34;&gt;&amp;quot;some title here&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; titleTextView&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;getText&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;().&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;toString&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;());&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+&lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/p&gt;
+
+&lt;p&gt;And the FragmentContainerActivity class:&lt;br /&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #ffffff&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color: #BB0066; font-weight: bold&#34;&gt;FragmentContainerActivity&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;extends&lt;/span&gt; FragmentActivity &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;private&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;static&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;final&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;int&lt;/span&gt; CONTAINER_ID &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color: #0000DD; font-weight: bold&#34;&gt;1&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;;&lt;/span&gt;
+
+  &lt;span style=&#34;color: #555555; font-weight: bold&#34;&gt;@Override&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;protected&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;onCreate&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;Bundle savedInstanceState&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;super&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;onCreate&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;savedInstanceState&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+
+    FrameLayout&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;LayoutParams&lt;/span&gt; params &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt;
+        &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;new&lt;/span&gt; FrameLayout&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;LayoutParams&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;ViewGroup&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;LayoutParams&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;MATCH_PARENT&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt;
+            ViewGroup&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;LayoutParams&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;MATCH_PARENT&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+    FrameLayout frameLayout &lt;span style=&#34;color: #333333&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;new&lt;/span&gt; FrameLayout&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;&lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;this&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+    frameLayout&lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;setId&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;CONTAINER_ID&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+
+    setContentView&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;frameLayout&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; params&lt;span style=&#34;color: #333333&#34;&gt;);&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+
+  &lt;span style=&#34;color: #008800; font-weight: bold&#34;&gt;public&lt;/span&gt; &lt;span style=&#34;color: #333399; font-weight: bold&#34;&gt;void&lt;/span&gt; &lt;span style=&#34;color: #0066BB; font-weight: bold&#34;&gt;addFragment&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;Fragment fragment&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; String tag&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt; &lt;span style=&#34;color: #333333&#34;&gt;{&lt;/span&gt;
+    getSupportFragmentManager&lt;span style=&#34;color: #333333&#34;&gt;().&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;beginTransaction&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;()&lt;/span&gt;
+        &lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;add&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;(&lt;/span&gt;CONTAINER_ID&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; fragment&lt;span style=&#34;color: #333333&#34;&gt;,&lt;/span&gt; tag&lt;span style=&#34;color: #333333&#34;&gt;)&lt;/span&gt;
+        &lt;span style=&#34;color: #333333&#34;&gt;.&lt;/span&gt;&lt;span style=&#34;color: #0000CC&#34;&gt;commit&lt;/span&gt;&lt;span style=&#34;color: #333333&#34;&gt;();&lt;/span&gt;
+  &lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;span style=&#34;color: #333333&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/p&gt;
+
+&lt;p&gt;One last thing is to add FragmentContainerActivity to the AndroidManifest.xml.&lt;br /&gt;
+Since this activity is only for testing purposes a good place to put it is under&lt;br /&gt;
+/src/debug/AndroidManifest.xml (if you are using Gradle as the build tool for you app),&lt;br /&gt;
+Otherwise add it to the main AndroidManifest.xml and remember to omit it from there before releasing your app.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>
