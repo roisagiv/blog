@@ -1,0 +1,351 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Testing a loader using instrumentation - Let's do it the hard way!</title>
+  <meta name="author" content="Roi Sagiv">
+
+  
+  <meta name="description" content="One of the biggest challenges when authoring instrumentation tests in Android is testing async code.
+AsyncTasks, Loaders, Handlers, etc.
+Robolectric &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://roisagiv.github.io/blog/2014/01/06/testing-a-loader-using-instrumentation">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="Let's do it the hard way!" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href='http://fonts.googleapis.com/css?family=Quattrocento+Sans|Roboto:400,300' rel='stylesheet' type='text/css'>
+
+  
+
+</head>
+
+
+<body>
+	<div class="container">
+		<aside class="left">
+			<div class="inner-left">
+				<header>
+					<img src="http://www.gravatar.com/avatar/b28350cd56c7ec883aefc659c3a0f81d?s=200" alt="Gravatar of Roi Sagiv " title="Gravatar of Roi Sagiv" class="profilepic" />
+<hgroup>
+  <h1><a href="/">Let's do it the hard way!</a></h1>
+  
+    <h2 class="subtitle">A blog about software.</h2>
+   
+</hgroup>
+
+
+				</header>
+				<footer>
+					<p>
+	
+	
+</p>
+				</footer>
+			</div>
+		</aside>
+    	<section class="right">
+    		<div class="inner-right">
+    			<div id="posts">
+    			  	<article class="post">
+    
+  <header>
+    
+      <h1 class="entry-title">Testing a Loader Using Instrumentation</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-01-06T20:51:07+02:00" pubdate data-updated="true">Jan 6<span>th</span>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>One of the biggest challenges when authoring instrumentation tests in Android is testing async code.
+AsyncTasks, Loaders, Handlers, etc.<br/>
+Robolectric for example, provides very convenient tools for this task (take a look at the <a href="https://github.com/robolectric/robolectric/blob/master/src/main/java/org/robolectric/util/Scheduler.java">Scheduler</a>) class,<br/>
+But since we&rsquo;re running instrumentation tests we don&rsquo;t have those tools.</p>
+
+<p>Back to loaders,<br/>
+Suppose we have an activity that initiate and load a loader on it&rsquo;s onCreate method.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">BookListActivity</span> <span class="kd">extends</span> <span class="n">FragmentActivity</span>
+</span><span class='line'>    <span class="kd">implements</span> <span class="n">LoaderManager</span><span class="o">.</span><span class="na">LoaderCallbacks</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">Book</span><span class="o">&gt;&gt;</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="kd">protected</span> <span class="kd">static</span> <span class="kd">final</span> <span class="kt">int</span> <span class="n">LOADER_ID_BOOK_LIST</span> <span class="o">=</span> <span class="mi">100</span><span class="o">;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// this field will be used in the test to validate onLoadFinished was called</span>
+</span><span class='line'>  <span class="kd">protected</span> <span class="kt">boolean</span> <span class="n">loaderFinished</span><span class="o">;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="nd">@Override</span> <span class="kd">protected</span> <span class="kt">void</span> <span class="n">onCreate</span><span class="o">(</span><span class="n">Bundle</span> <span class="n">savedInstanceState</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="kd">super</span><span class="o">.</span><span class="na">onCreate</span><span class="o">(</span><span class="n">savedInstanceState</span><span class="o">);</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">Loader</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">Book</span><span class="o">&gt;&gt;</span> <span class="n">loader</span> <span class="o">=</span>
+</span><span class='line'>        <span class="n">getSupportLoaderManager</span><span class="o">().</span><span class="na">initLoader</span><span class="o">(</span><span class="n">LOADER_ID_BOOK_LIST</span><span class="o">,</span> <span class="kc">null</span><span class="o">,</span> <span class="k">this</span><span class="o">);</span>
+</span><span class='line'>    <span class="n">loader</span><span class="o">.</span><span class="na">forceLoad</span><span class="o">();</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="nd">@Override</span> <span class="kd">public</span> <span class="n">Loader</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">Book</span><span class="o">&gt;&gt;</span> <span class="n">onCreateLoader</span><span class="o">(</span><span class="kt">int</span> <span class="n">i</span><span class="o">,</span> <span class="n">Bundle</span> <span class="n">bundle</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">loaderFinished</span> <span class="o">=</span> <span class="kc">false</span><span class="o">;</span>
+</span><span class='line'>    <span class="k">return</span> <span class="k">new</span> <span class="nf">BooksQueryLoader</span><span class="o">(</span><span class="k">this</span><span class="o">);</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="nd">@Override</span> <span class="kd">public</span> <span class="kt">void</span> <span class="n">onLoadFinished</span><span class="o">(</span><span class="n">Loader</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">Book</span><span class="o">&gt;&gt;</span> <span class="n">loader</span><span class="o">,</span> <span class="n">List</span><span class="o">&lt;</span><span class="n">Book</span><span class="o">&gt;</span> <span class="n">data</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="c1">// bind the results to UI elements (ListView, TextView, etc)</span>
+</span><span class='line'>    <span class="n">loaderFinished</span> <span class="o">=</span> <span class="kc">true</span><span class="o">;</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="nd">@Override</span> <span class="kd">public</span> <span class="kt">void</span> <span class="n">onLoaderReset</span><span class="o">(</span><span class="n">Loader</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">Book</span><span class="o">&gt;&gt;</span> <span class="n">objectLoader</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">BooksQueryLoader</span> <span class="kd">extends</span> <span class="n">AsyncTaskLoader</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">Book</span><span class="o">&gt;&gt;</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="kd">public</span> <span class="nf">BooksQueryLoader</span><span class="o">(</span><span class="n">Context</span> <span class="n">context</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="kd">super</span><span class="o">(</span><span class="n">context</span><span class="o">);</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="nd">@Override</span> <span class="kd">public</span> <span class="n">List</span><span class="o">&lt;</span><span class="n">Book</span><span class="o">&gt;</span> <span class="n">loadInBackground</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>    <span class="c1">// do a query here that might take some time</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>      <span class="c1">// simulate time consuming task</span>
+</span><span class='line'>      <span class="n">Thread</span><span class="o">.</span><span class="na">sleep</span><span class="o">(</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">1000</span><span class="o">);</span>
+</span><span class='line'>    <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">InterruptedException</span> <span class="n">ignored</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">return</span> <span class="k">new</span> <span class="n">ArrayList</span><span class="o">&lt;</span><span class="n">Book</span><span class="o">&gt;();</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>How would we test the code that executed on onLoadFinished method?</p>
+
+<p>In one of the times I cruised around the Android source code I stumbled upon the <a href="https://github.com/android/platform_packages_apps_contacts/blob/master/src/com/android/contacts/interactions/TestLoaderManager.java">TestLoaderManager</a> class.<br/>
+Let&rsquo;s see how to use this trick to wait for Loaders to finish (and call onLoadFinished) in a test.</p>
+
+<p>Here is the test:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">BookListActivityTest</span> <span class="kd">extends</span> <span class="n">ActivityInstrumentationTestCase2</span><span class="o">&lt;</span><span class="n">BookListActivity</span><span class="o">&gt;</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="kd">public</span> <span class="nf">BookListActivityTest</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>    <span class="kd">super</span><span class="o">(</span><span class="n">BookListActivity</span><span class="o">.</span><span class="na">class</span><span class="o">);</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="kd">public</span> <span class="kt">void</span> <span class="nf">testTryingOutTheLoader</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">BookListActivity</span> <span class="n">activity</span> <span class="o">=</span> <span class="n">getActivity</span><span class="o">();</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">Loader</span><span class="o">&lt;?&gt;</span> <span class="n">loader</span> <span class="o">=</span>
+</span><span class='line'>        <span class="n">activity</span><span class="o">.</span><span class="na">getSupportLoaderManager</span><span class="o">().</span><span class="na">getLoader</span><span class="o">(</span><span class="n">BookListActivity</span><span class="o">.</span><span class="na">LOADER_ID_BOOK_LIST</span><span class="o">);</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">// this is where the &quot;magic&quot; happens</span>
+</span><span class='line'>    <span class="n">LoaderUtils</span><span class="o">.</span><span class="na">waitForLoader</span><span class="o">(</span><span class="n">loader</span><span class="o">);</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">// this test passes only if onLoaderFinished method is called</span>
+</span><span class='line'>    <span class="n">assertTrue</span><span class="o">(</span><span class="n">activity</span><span class="o">.</span><span class="na">loaderFinished</span><span class="o">);</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Here is the code for LoaderUtils (inspired by TestLoaderManager class from the Android source code):</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='java'><span class='line'><span class="kd">public</span> <span class="kd">class</span> <span class="nc">LoaderUtils</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="kd">public</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">waitForLoader</span><span class="o">(</span><span class="n">Loader</span><span class="o">&lt;?&gt;</span> <span class="n">loader</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="kd">final</span> <span class="n">AsyncTaskLoader</span><span class="o">&lt;?&gt;</span> <span class="n">asyncTaskLoader</span> <span class="o">=</span> <span class="o">(</span><span class="n">AsyncTaskLoader</span><span class="o">&lt;?&gt;)</span> <span class="n">loader</span><span class="o">;</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">Thread</span> <span class="n">waitThreads</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Thread</span><span class="o">(</span><span class="s">&quot;LoaderWaitingThread&quot;</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>      <span class="nd">@Override</span>
+</span><span class='line'>      <span class="kd">public</span> <span class="kt">void</span> <span class="nf">run</span><span class="o">()</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>          <span class="n">asyncTaskLoader</span><span class="o">.</span><span class="na">waitForLoader</span><span class="o">();</span>
+</span><span class='line'>        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">Throwable</span> <span class="n">e</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>          <span class="n">Assert</span><span class="o">.</span><span class="na">fail</span><span class="o">(</span><span class="s">&quot;Exception while waiting for loader: &quot;</span> <span class="o">+</span> <span class="n">asyncTaskLoader</span><span class="o">.</span><span class="na">getId</span><span class="o">());</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>      <span class="o">}</span>
+</span><span class='line'>    <span class="o">};</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">waitThreads</span><span class="o">.</span><span class="na">start</span><span class="o">();</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">// Now we wait for all these threads to finish</span>
+</span><span class='line'>    <span class="k">try</span> <span class="o">{</span>
+</span><span class='line'>      <span class="n">waitThreads</span><span class="o">.</span><span class="na">join</span><span class="o">();</span>
+</span><span class='line'>    <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="n">InterruptedException</span> <span class="n">ignored</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This trick will work with <a href="http://developer.android.com/reference/android/content/CursorLoader.html">CursorLoader</a> too, as CursorLoader class inherit from AsyncTackLoader class.</p>
+</div>
+
+
+</article>
+
+
+        <div class="sharing">
+  
+  
+  
+</div>
+
+
+
+
+
+    			</div>
+    			<footer id="footer">
+    				<p class="credit">
+  Copyright &copy; 2014 - Roi Sagiv. Powered by <a href="http://octopress.org">Octopress</a>
+</p>
+
+
+    			</footer>
+    			
+
+
+
+
+
+
+
+
+
+
+<link href='http://fonts.googleapis.com/css?family=Quattrocento+Sans|Roboto:400,300' rel='stylesheet' type='text/css'>
+
+
+
+
+
+    		</div>
+    	</section>
+  	</div>
+</body>
+</html>
