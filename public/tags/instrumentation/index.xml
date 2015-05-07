@@ -2,19 +2,19 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Instrumentation on Learning the hard way!</title>
-    <link>http://roisagiv.github.io/tags/instrumentation/</link>
+    <link>http://localhost:1313/tags/instrumentation/</link>
     <description>Recent content in Instrumentation on Learning the hard way!</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <lastBuildDate>Mon, 06 Jan 2014 20:51:07 +0200</lastBuildDate>
-    <atom:link href="http://roisagiv.github.io/tags/instrumentation/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://localhost:1313/tags/instrumentation/index.xml" rel="self" type="application/rss+xml" />
     
     <item>
       <title>Testing a loader using instrumentation</title>
-      <link>http://roisagiv.github.io/blog/2014/01/06/testing-a-loader-using-instrumentation/</link>
+      <link>http://localhost:1313/blog/2014/01/06/testing-a-loader-using-instrumentation/</link>
       <pubDate>Mon, 06 Jan 2014 20:51:07 +0200</pubDate>
       
-      <guid>http://roisagiv.github.io/blog/2014/01/06/testing-a-loader-using-instrumentation/</guid>
+      <guid>http://localhost:1313/blog/2014/01/06/testing-a-loader-using-instrumentation/</guid>
       <description>&lt;p&gt;One of the biggest challenges when authoring instrumentation tests in Android is testing async code.
 AsyncTasks, Loaders, Handlers, etc.&lt;br /&gt;
 Robolectric for example, provides very convenient tools for this task (take a look at the &lt;a href=&#34;https://github.com/robolectric/robolectric/blob/master/src/main/java/org/robolectric/util/Scheduler.java&#34;&gt;Scheduler&lt;/a&gt;) class,&lt;br /&gt;
@@ -141,10 +141,10 @@ This trick will work with &lt;a href=&#34;http://developer.android.com/reference
     
     <item>
       <title>Testing a fragment using instrumentation</title>
-      <link>http://roisagiv.github.io/blog/2014/01/04/testing-a-fragment-using-instrumentation/</link>
+      <link>http://localhost:1313/blog/2014/01/04/testing-a-fragment-using-instrumentation/</link>
       <pubDate>Sat, 04 Jan 2014 12:05:50 +0200</pubDate>
       
-      <guid>http://roisagiv.github.io/blog/2014/01/04/testing-a-fragment-using-instrumentation/</guid>
+      <guid>http://localhost:1313/blog/2014/01/04/testing-a-fragment-using-instrumentation/</guid>
       <description>&lt;p&gt;Fragments are core component in Android, but somehow the Android SDK does not provide out of the box
 way to test them.&lt;br /&gt;
 Activities, ContentProviders, Services has their corresponding class (ActivityInstrumentationTestCase2, ProviderTestCase2 and ServiceTestCase), but where is my FragmentTestCase?&lt;/p&gt;

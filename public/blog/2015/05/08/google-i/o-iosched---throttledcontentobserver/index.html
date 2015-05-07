@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+<head>
+  <link href="http://gmpg.org/xfn/11" rel="profile">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+
+  <title>Google I/O (iosched) - ThrottledContentObserver &middot; Roi Sagiv</title>
+
+  
+  <link rel="stylesheet" href="http://localhost:1313//css/poole.css">
+  <link rel="stylesheet" href="http://localhost:1313//css/hyde.css">
+  <link rel="stylesheet" href="http://localhost:1313//css/poole-overrides.css">
+  <link rel="stylesheet" href="http://localhost:1313//css/hyde-overrides.css">
+  <link rel="stylesheet" href="http://localhost:1313//css/hyde-x.css">
+  <link rel="stylesheet" href="http://localhost:1313//css/highlight/rainbow.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=PT+Sans:400,400italic,700|Abril+Fatface">
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+  
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="http://localhost:1313/apple-touch-icon-144-precomposed.png">
+  <link href="http://localhost:1313/favicon.png" rel="icon">
+
+  
+  
+  
+  
+
+  <meta name="description" content="Testing com.google.samples.apps.iosched.util.ThrottledContentObserver class from iosched source code">
+  <meta name="keywords" content="">
+  <link rel="author" href="http://plus.google.com/108142673266395237085">
+</head>
+<body class="theme-base-0d layout-reverse">
+<div class="sidebar">
+  <div class="container sidebar-sticky">
+    <div class="sidebar-about">
+      
+      <h1>Roi Sagiv</h1>
+      <p class="lead"><p>Taking the longer path</p>
+</p>
+    </div>
+
+    <ul class="sidebar-nav">
+      <li class="sidebar-nav-item"><a href="http://localhost:1313//">Blog</a></li>
+      
+    </ul>
+
+    <ul class="sidebar-nav">
+      <li class="sidebar-nav-item">
+      <a href="https://github.com/roisagiv"><i class="fa fa-github-square fa-3x"></i></a>
+      
+      <a href="http://www.linkedin.com/in/roisagiv"><i class="fa fa-linkedin-square fa-3x"></i></a>
+      
+      
+      
+      </li>
+    </ul>
+
+    <p>Copyright &copy; 2015 <a href="http://localhost:1313//license">License</a><br/>
+       Powered by <a href="http://gohugo.io">Hugo</a> and <a href="https://github.com/zyro/hyde-x">Hyde-X</a></p>
+  </div>
+</div>
+
+
+<div class="content container">
+  <div class="post">
+    <h1>Google I/O (iosched) - ThrottledContentObserver</h1>
+    <span class="post-date">May 8, 2015 &middot; 8 minute read
+    
+    <br/>
+    
+    <a class="label" href="http://localhost:1313//categories/android">Android</a><a class="label" href="http://localhost:1313//categories/testing">Testing</a><a class="label" href="http://localhost:1313//categories/iosched">iosched</a>
+    </span>
+    
+
+<p>Writing tests for your code is hard.
+<br>Even when you start a fresh new project and you can make any choices about the structure of your code, nailing those tests is a challenging task.
+<br>In most cases you don&rsquo;t have the privilege of starting a new project. In most cases you are facing existing code (legacy code). Adding tests to existing code is even more challenging.</p>
+
+<h3 id="google-i-o-iosched:e40bb66743e104c9effd8752af690f72">Google I/O - iosched</h3>
+
+<p>In the next series of posts I will try to demonstrate couple of technics on how to approach this task of adding tests to existing Android codebase.
+I started looking for a good candidate, an application complex enough with various features and technologies and then it hit me.</p>
+
+<p><em>Google I/O</em>.</p>
+
+<p>The opened source demo app Google release every year (every I/O conference) to act as a reference to new features and how to build an app in general. This application does not contain tests (WTF Google?! this is how you educated your community?!).</p>
+
+<p>I will try to take this application and make it testable, piece by piece, class by class.</p>
+
+<p>On this post I&rsquo;ll focus on 1 class:</p>
+
+<h3 id="throttledcontentobserver:e40bb66743e104c9effd8752af690f72">ThrottledContentObserver</h3>
+
+<p>Let&rsquo;s have a look at the class <code>com.google.samples.apps.iosched.util.ThrottledContentObserver</code></p>
+
+<pre><code class="language-java">/*
+ * Copyright 2014 Google Inc. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.google.samples.apps.iosched.util;
+
+import android.database.ContentObserver;
+import android.net.Uri;
+import android.os.Handler;
+
+/**
+ * A ContentObserver that bundles multiple consecutive changes in a short time period into one.
+ * This can be used in place of a regular ContentObserver to protect against getting
+ * too many consecutive change events as a result of data changes. This observer will wait
+ * a while before firing, so if multiple requests come in in quick succession, they will
+ * cause it to fire only once.
+ */
+public class ThrottledContentObserver extends ContentObserver {
+    Handler mMyHandler;
+    Runnable mScheduledRun = null;
+    private static final int THROTTLE_DELAY = 1000;
+    Callbacks mCallback = null;
+
+    public interface Callbacks {
+        public void onThrottledContentObserverFired();
+    }
+
+    public ThrottledContentObserver(Callbacks callback) {
+        super(null);
+        mMyHandler = new Handler();
+        mCallback = callback;
+    }
+
+    @Override
+    public void onChange(boolean selfChange) {
+        if (mScheduledRun != null) {
+            mMyHandler.removeCallbacks(mScheduledRun);
+        } else {
+            mScheduledRun = new Runnable() {
+                @Override
+                public void run() {
+                    if (mCallback != null) {
+                        mCallback.onThrottledContentObserverFired();
+                    }
+                }
+            };
+        }
+        mMyHandler.postDelayed(mScheduledRun, THROTTLE_DELAY);
+    }
+
+    public void cancelPendingCallback() {
+        if (mScheduledRun != null) {
+            mMyHandler.removeCallbacks(mScheduledRun);
+        }
+    }
+
+    @Override
+    public void onChange(boolean selfChange, Uri uri) {
+        onChange(selfChange);
+    }
+}
+</code></pre>
+
+<p>I consider this class as not easily testable.</p>
+
+<p>Let&rsquo;s make few modifications to this class. The functionality will stay the same, but it will make our life so much easier testing wise.</p>
+
+<pre><code class="language-java">
+package com.google.samples.apps.iosched.util;
+
+import android.database.ContentObserver;
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+
+/**
+ * A ContentObserver that bundles multiple consecutive changes in a short time period into one.
+ * This can be used in place of a regular ContentObserver to protect against getting
+ * too many consecutive change events as a result of data changes. This observer will wait
+ * a while before firing, so if multiple requests come in in quick succession, they will
+ * cause it to fire only once.
+ */
+public class ThrottledContentObserver extends ContentObserver {
+    Handler mMyHandler;
+    protected static final int THROTTLE_DELAY = 1000;
+    Runnable mScheduledRun = null;
+    Callbacks mCallback = null;
+
+    public interface Callbacks {
+        void onThrottledContentObserverFired();
+    }
+
+    public ThrottledContentObserver(Callbacks callback) {
+        this(callback, Looper.myLooper());
+    }
+
+    public ThrottledContentObserver(Callbacks callback, Looper looper) {
+        super(null);
+        mMyHandler = createHandler(looper);
+        mCallback = callback;
+    }
+
+    protected Handler createHandler(Looper looper) {
+        return new Handler(looper);
+    }
+
+    @Override
+    public void onChange(boolean selfChange) {
+        if (mScheduledRun != null) {
+            mMyHandler.removeCallbacks(mScheduledRun);
+        } else {
+            mScheduledRun = new Runnable() {
+                @Override
+                public void run() {
+                    if (mCallback != null) {
+                        mCallback.onThrottledContentObserverFired();
+                    }
+                }
+            };
+        }
+        mMyHandler.postDelayed(mScheduledRun, THROTTLE_DELAY);
+    }
+
+    public void cancelPendingCallback() {
+        if (mScheduledRun != null) {
+            mMyHandler.removeCallbacks(mScheduledRun);
+        }
+    }
+
+    @Override
+    public void onChange(boolean selfChange, Uri uri) {
+        onChange(selfChange);
+    }
+}
+</code></pre>
+
+<p>Let&rsquo;s go over the changes:</p>
+
+<ol>
+<li>Added new constructor that accepts Looper. This will allow us to &ldquo;inject&rdquo; A Looper of our choice during the tests.</li>
+<li>Refactored the creation of the Handler into a protected method. In the tests we will be able to override this method and provide an alternative Handler implementation that will assist us with the tests.</li>
+<li>THROTTLE_DELAY changed to protected, so it will be accessible from the test code.</li>
+</ol>
+
+<p>Now it is time for the testing code.
+First, let&rsquo;s add a few testing libraries to our project&rsquo;s gradle.</p>
+
+<pre><code class="language-groovy">
+...
+
+android {
+
+    ...
+
+    defaultConfig {
+
+        testInstrumentationRunner &quot;android.support.test.runner.AndroidJUnitRunner&quot;
+    }
+
+    // Required if using com.android.support.test:testing-support-lib
+    packagingOptions {
+        exclude 'LICENSE.txt'
+        exclude 'LICENSE'
+        exclude 'NOTICE'
+        exclude 'asm-license.txt'
+    }
+
+    ...
+}
+
+dependencies {
+
+    ...
+
+    androidTestCompile 'com.android.support.test:runner:0.2'
+    // Set this dependency to use JUnit 4 rules
+    androidTestCompile 'com.android.support.test:rules:0.2'
+    // Set this dependency to build and run Espresso tests
+    androidTestCompile 'com.android.support.test.espresso:espresso-core:2.1'
+
+    androidTestCompile 'com.google.dexmaker:dexmaker:1.2'
+    androidTestCompile 'com.google.dexmaker:dexmaker-mockito:1.2'
+    // The newest version that will work on Android
+    androidTestCompile 'org.mockito:mockito-core:1.9.5'
+
+    ...
+}
+
+...
+
+</code></pre>
+
+<ol>
+<li>Added testInstrumentationRunner of type <code>android.support.test.runner.AndroidJUnitRunner</code></li>
+<li>Added <code>packagingOptions</code> section</li>
+<li>Added couple of testing libraries: <code>android.support.test</code>, <code>mockito</code></li>
+</ol>
+
+<p>Now, let&rsquo;s see how the test class looks like:</p>
+
+<pre><code class="language-java">package com.google.samples.apps.iosched.util;
+
+import com.google.samples.apps.iosched.test.MockHandler;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mockito;
+
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+import android.support.test.InstrumentationRegistry;
+import android.support.test.runner.AndroidJUnit4;
+
+/**
+ *
+ */
+@RunWith(AndroidJUnit4.class)
+public class ThrottledContentObserverTest {
+
+    @Test
+    public void onChangeShouldTriggerCallbacksAfterDelay() {
+        // arrange
+        Looper looper = InstrumentationRegistry.getTargetContext().getMainLooper();
+        ThrottledContentObserver.Callbacks mockedCallbacks = Mockito.mock(ThrottledContentObserver.Callbacks.class);
+        TestableThrottledContentObserver contentObserver =
+                new TestableThrottledContentObserver(mockedCallbacks, looper);
+
+        // act
+        contentObserver.onChange(true);
+        contentObserver.mMockHandler.advanceBy(ThrottledContentObserver.THROTTLE_DELAY);
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+
+        // assert
+        Mockito.verify(mockedCallbacks).onThrottledContentObserverFired();
+    }
+
+    @Test
+    public void onChangeShouldNotTriggerCallbacksBeforeDelay() {
+        // arrange
+        Looper looper = InstrumentationRegistry.getTargetContext().getMainLooper();
+        ThrottledContentObserver.Callbacks mockedCallbacks = Mockito.mock(ThrottledContentObserver.Callbacks.class);
+        TestableThrottledContentObserver contentObserver =
+                new TestableThrottledContentObserver(mockedCallbacks, looper);
+
+        // act
+        contentObserver.onChange(true);
+        contentObserver.mMockHandler.advanceBy(ThrottledContentObserver.THROTTLE_DELAY - 1);
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+
+        // assert
+        Mockito.verify(mockedCallbacks, Mockito.never()).onThrottledContentObserverFired();
+    }
+
+    @Test
+    public void cancelPendingCallbackShouldRemoveFutureCallbackTriggers() {
+        // arrange
+        Looper looper = InstrumentationRegistry.getTargetContext().getMainLooper();
+        ThrottledContentObserver.Callbacks mockedCallbacks = Mockito.mock(ThrottledContentObserver.Callbacks.class);
+        TestableThrottledContentObserver contentObserver =
+                new TestableThrottledContentObserver(mockedCallbacks, looper);
+
+        // act
+        contentObserver.onChange(true, Uri.EMPTY);
+        contentObserver.cancelPendingCallback();
+        contentObserver.mMockHandler.advanceBy(ThrottledContentObserver.THROTTLE_DELAY);
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+
+        // assert
+        Mockito.verify(mockedCallbacks, Mockito.never()).onThrottledContentObserverFired();
+    }
+
+    private static class TestableThrottledContentObserver extends ThrottledContentObserver {
+
+        private MockHandler mMockHandler;
+
+        public TestableThrottledContentObserver(Callbacks callback, Looper looper) {
+            super(callback, looper);
+        }
+
+        @Override
+        protected Handler createHandler(Looper looper) {
+            mMockHandler = new MockHandler(looper);
+            return mMockHandler;
+        }
+
+    }
+}
+</code></pre>
+
+<p>I want to focus on <code>TestableThrottledContentObserver</code> class for a minute. This is an inner class in the test file, It&rsquo;s sole purpose is to override <code>createHandler</code> method and provide an alternative implementation for Handler.</p>
+
+<p>Let&rsquo;s see what this alternative implementation is:</p>
+
+<pre><code class="language-java">package com.google.samples.apps.iosched.test;
+
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+import android.os.SystemClock;
+import android.support.annotation.NonNull;
+
+import java.util.LinkedList;
+import java.util.Queue;
+
+public class MockHandler extends Handler {
+
+    private final Queue&lt;MessageWrapper&gt; messages;
+
+    public MockHandler(Looper looper) {
+        super(looper);
+        messages = new LinkedList&lt;&gt;();
+    }
+
+    @Override
+    public boolean sendMessageAtTime(@NonNull Message msg, long uptimeMillis) {
+        messages.add(new MessageWrapper(msg, uptimeMillis));
+
+        // Put this message in the super. This way we can track calls to removeMessages,
+        // since we cannot override removeMessages method (it's final).
+        // By using Integer.MAX_VALUE as 'when' we make sure super will never dispatch this message
+        super.sendMessageAtTime(Message.obtain(msg), Integer.MAX_VALUE);
+
+        return true;
+    }
+
+    public void advanceBy(long interval) {
+        Queue&lt;MessageWrapper&gt; futureMessages = new LinkedList&lt;&gt;();
+
+        while (!messages.isEmpty()) {
+            MessageWrapper messageWrapper = messages.poll();
+
+            if (!super.hasMessages(messageWrapper.message.what)) {
+                // do nothing, super does not have this message, it has been removed
+                continue;
+            }
+
+            long virtualNow = interval + SystemClock.uptimeMillis();
+
+            if (messageWrapper.when &lt;= virtualNow) {
+
+                super.removeMessages(messageWrapper.message.what);
+                super.dispatchMessage(messageWrapper.message);
+
+            } else {
+                futureMessages.add(new MessageWrapper(
+                        messageWrapper.message,
+                        messageWrapper.when - virtualNow - 1));
+            }
+        }
+
+        messages.addAll(futureMessages);
+    }
+
+    private static class MessageWrapper {
+        private final Message message;
+        private final long when;
+
+        private MessageWrapper(Message message, long when) {
+            this.message = message;
+            this.when = when;
+        }
+    }
+}
+</code></pre>
+
+<p>This <code>MockHandler</code> class exposes the method <code>advanceBy</code> which allow us to bend time, saving us from annoying <code>sleep</code> calls in our testing code.</p>
+
+<p>Going back to our test code, let&rsquo;s look at this test method:</p>
+
+<pre><code class="language-java">@Test
+public void onChangeShouldTriggerCallbacksAfterDelay() {
+    // arrange
+    Looper looper = InstrumentationRegistry.getTargetContext().getMainLooper();
+    ThrottledContentObserver.Callbacks mockedCallbacks = Mockito.mock(ThrottledContentObserver.Callbacks.class);
+    TestableThrottledContentObserver contentObserver =
+            new TestableThrottledContentObserver(mockedCallbacks, looper);
+
+    // act
+    contentObserver.onChange(true);
+    contentObserver.mMockHandler.advanceBy(ThrottledContentObserver.THROTTLE_DELAY);
+    InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+
+    // assert
+    Mockito.verify(mockedCallbacks).onThrottledContentObserverFired();
+}
+</code></pre>
+
+<p>We can see the call to <code>contentObserver.mMockHandler.advanceBy(ThrottledContentObserver.THROTTLE_DELAY)</code>.
+This call will &ldquo;move forward&rdquo; in time, and trigger the delayed Runnable.</p>
+
+<h3 id="robolectric:e40bb66743e104c9effd8752af690f72">Robolectric</h3>
+
+<p>I want to take this opportunity and see how these tests would look like when running them using Robolectric library. This can be a way to understand what are few of Roboletric capabilities.</p>
+
+<pre><code class="language-java">package com.google.samples.apps.iosched.util;
+
+import com.google.samples.apps.iosched.BuildConfig;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mockito;
+import org.robolectric.Robolectric;
+import org.robolectric.RobolectricGradleTestRunner;
+import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.Config;
+
+import android.net.Uri;
+import android.os.Looper;
+
+/**
+ *
+ */
+@RunWith(RobolectricGradleTestRunner.class)
+@Config(constants = BuildConfig.class, emulateSdk = 16)
+public class ThrottledContentObserverTest {
+
+    @Test
+    public void onChangeShouldTriggerCallbacksAfterDelay() {
+        // arrange
+        Looper looper = RuntimeEnvironment.application.getMainLooper();
+        ThrottledContentObserver.Callbacks mockedCallbacks = Mockito.mock(ThrottledContentObserver.Callbacks.class);
+        ThrottledContentObserver contentObserver =
+                new ThrottledContentObserver(mockedCallbacks, looper);
+
+        // act
+        contentObserver.onChange(true);
+        Robolectric.getForegroundThreadScheduler().advanceBy(ThrottledContentObserver.THROTTLE_DELAY);
+
+        // assert
+        Mockito.verify(mockedCallbacks).onThrottledContentObserverFired();
+    }
+
+    @Test
+    public void onChangeShouldNotTriggerCallbacksBeforeDelay() {
+        // arrange
+        Looper looper = RuntimeEnvironment.application.getMainLooper();
+        ThrottledContentObserver.Callbacks mockedCallbacks = Mockito.mock(ThrottledContentObserver.Callbacks.class);
+        ThrottledContentObserver contentObserver =
+                new ThrottledContentObserver(mockedCallbacks, looper);
+
+        // act
+        contentObserver.onChange(true);
+        Robolectric.getForegroundThreadScheduler().advanceBy(ThrottledContentObserver.THROTTLE_DELAY - 1);
+
+        // assert
+        Mockito.verify(mockedCallbacks, Mockito.never()).onThrottledContentObserverFired();
+    }
+
+    @Test
+    public void cancelPendingCallbackShouldRemoveFutureCallbackTriggers() {
+        // arrange
+        Looper looper = RuntimeEnvironment.application.getMainLooper();
+        ThrottledContentObserver.Callbacks mockedCallbacks = Mockito.mock(ThrottledContentObserver.Callbacks.class);
+        ThrottledContentObserver contentObserver = new ThrottledContentObserver(mockedCallbacks, looper);
+
+        // act
+        contentObserver.onChange(true, Uri.EMPTY);
+        contentObserver.cancelPendingCallback();
+        Robolectric.getForegroundThreadScheduler().advanceBy(ThrottledContentObserver.THROTTLE_DELAY);
+
+        // assert
+        Mockito.verify(mockedCallbacks, Mockito.never()).onThrottledContentObserverFired();
+    }
+}
+
+</code></pre>
+
+<p>As you can see, we are not required to have <code>MockHandler</code> class. Robolectric provide us with the  capability of &ldquo;moving forward&rdquo; in time out of the box. Since we are not required to have <code>MockHandler</code> we are also not required to have <code>TestableThrottledContentObserver</code> either.</p>
+
+  </div>
+  
+</div>
+
+
+
+
+<script src="http://localhost:1313//js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script>
+  var _gaq=[['_setAccount','UA-62788442-1'],['_trackPageview']];
+  (function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
+  g.src=('https:'==location.protocol?'//ssl':'//www')+'.google-analytics.com/ga.js';
+  s.parentNode.insertBefore(g,s)}(document,'script'));
+</script>
+
+<script>document.write('<script src="http://'
+        + (location.host || 'localhost').split(':')[0]
+		+ ':1313/livereload.js?mindelay=10"></'
+        + 'script>')</script></body>
+</html>

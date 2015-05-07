@@ -1,6 +1,7 @@
-baseurl = "http://roisagiv.github.io/"
-languageCode = "en-us"
+baseurl = "http://roisagiv.github.io"
 title = "Learning the hard way!"
+languageCode = "en-us"
+MetaDataFormat = "toml"
 theme = "hyde-x"
 layoutdir = "layouts"
 publishdir = "public"
@@ -15,8 +16,14 @@ pygmentsstyle = "colorful"
     # Change the permalink format for the 'post' content type.
     post = "/blog/:year/:month/:day/:title/"
 
-[Params]
-    highlight = "solarized-dark"
+[params]
+    # Changes sidebar background and link/accent colours.
+    # See the original Hyde theme for more colour options.
+    # This also works: "theme-base-08 layout-reverse", or just "layout-reverse".
+    theme = "theme-base-0d layout-reverse"
+    highlight = "rainbow"
+    googleAnalytics = "UA-62788442-1"
+    googleAuthorship = "108142673266395237085"
     github = "https://github.com/roisagiv"
     linkedin = "http://www.linkedin.com/in/roisagiv"
     tagline = "Taking the longer path"

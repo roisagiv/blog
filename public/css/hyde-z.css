@@ -1,0 +1,172 @@
+/*
+ * Additional CSS for Hyde-X
+ */
+
+.posts {
+  list-style: none;
+}
+
+#serieslist {
+    float: right;
+}
+
+a.tag {
+    padding-left: .5rem;
+    padding-right: .5rem;
+    background-color: #0089CF;
+    color: white;
+    border-radius: 3px;
+}
+
+a.category {
+    padding-left: .5rem;
+    padding-right: .5rem;
+    background-color: #0DB14B;
+    color: white;
+    border-radius: 3px;
+}
+
+a.series {
+    padding-left: .5rem;
+    padding-right: .5rem;
+    background-color: #F7B813;
+    color: white;
+    border-radius: 3px;
+}
+
+a.codelink {
+    background: transparent;
+    font-size: 100%;
+    font-family: "Courier New", Courier, monospace;
+}
+
+blockquote{
+    display:block;
+    background: #fff;
+    padding: 15px 20px 15px 45px;
+    margin: 0 0 20px;
+    position: relative;
+
+    /*Font*/
+    font-family: Georgia, serif;
+    font-size: 16px;
+    line-height: 1.2;
+    color: #666;
+    text-align: justify;
+
+    /*Borders - (Optional)*/
+    border-left: 10px solid #F7B813;
+    border-right: 2px solid #F7B813;
+
+    /*Box Shadow - (Optional)*/
+    -moz-box-shadow: 2px 2px 15px #ccc;
+    -webkit-box-shadow: 2px 2px 15px #ccc;
+    box-shadow: 2px 2px 15px #ccc;
+}
+
+blockquote::before{
+    content: "\201C"; /*Unicode for Left Double Quote*/
+
+    /*Font*/
+    font-family: Georgia, serif;
+    font-size: 60px;
+    font-weight: bold;
+    color: #999;
+
+    /*Positioning*/
+    position: absolute;
+    left: 5px;
+    top:-5px;
+}
+
+blockquote::after{
+    /*Reset to make sure*/
+    content: "";
+}
+
+blockquote a{
+    text-decoration: none;
+    background: #eee;
+    cursor: pointer;
+    padding: 0 3px;
+    color: #c76c0c;
+}
+
+blockquote a:hover{
+    color: #666;
+}
+
+blockquote em{
+    font-style: italic;
+}
+
+cite {
+    white-space:pre;
+}
+
+cite:before {
+    content: '\A\A\2014';
+}
+
+.excerpt {
+    border-left: 10px solid #0089CF;
+    border-right: 2px solid #0089CF;
+
+    -moz-box-shadow: 2px 2px 15px #ccc;
+    -webkit-box-shadow: 2px 2px 15px #ccc;
+    box-shadow: 2px 2px 15px #ccc;
+    font-family: "Courier New", Courier, monospace;
+    font-size: .65rem;
+    padding: .5rem 1rem;
+    margin: .8rem 0;
+    color: #7a7a7a;
+}
+
+code {
+    font-family: "Courier New", Courier, monospace;
+    padding: 0rem .2rem;
+    background: transparent;
+    font-size: 100%;
+    color: black;
+}
+
+.code-footer {
+    padding-bottom: 20px;
+}
+
+.code-footer-content {
+    float: right;
+    white-space: nowrap;
+}
+
+.code-label {
+    float:left;
+    text-align: right;
+    font-weight: bold;
+    font-size: .65rem;
+    margin-right: 1em;
+}
+
+a.extern_code {
+    float:left;
+    display: block;
+    height: 16px;
+    width: 16px;
+}
+
+a.github {
+    background-image: url('/img/link-github.png');
+}
+
+a.goplayground {
+    background-image: url('/img/link-gopher.png');
+}
+
+.code-line-link {
+    cursor: url('/img/cursor-code-line-link.png'), n-resize;
+    border-bottom: 1px dotted black;
+}
+
+.footnotes {
+    font-size: .65rem;
+}
