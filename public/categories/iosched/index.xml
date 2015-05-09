@@ -2,19 +2,19 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Iosched on Learning the hard way!</title>
-    <link>http://localhost:1313/categories/iosched/</link>
+    <link>http://roisagiv.github.io/categories/iosched/</link>
     <description>Recent content in Iosched on Learning the hard way!</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <lastBuildDate>Fri, 08 May 2015 00:47:26 +0300</lastBuildDate>
-    <atom:link href="http://localhost:1313/categories/iosched/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://roisagiv.github.io/categories/iosched/index.xml" rel="self" type="application/rss+xml" />
     
     <item>
       <title>Google I/O (iosched) - ThrottledContentObserver</title>
-      <link>http://localhost:1313/blog/2015/05/08/google-i/o-iosched---throttledcontentobserver/</link>
+      <link>http://roisagiv.github.io/blog/2015/05/08/google-i/o-iosched---throttledcontentobserver/</link>
       <pubDate>Fri, 08 May 2015 00:47:26 +0300</pubDate>
       
-      <guid>http://localhost:1313/blog/2015/05/08/google-i/o-iosched---throttledcontentobserver/</guid>
+      <guid>http://roisagiv.github.io/blog/2015/05/08/google-i/o-iosched---throttledcontentobserver/</guid>
       <description>
 
 &lt;p&gt;Writing tests for your code is hard.
